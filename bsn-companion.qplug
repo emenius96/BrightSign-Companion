@@ -1,0 +1,568 @@
+-- Basic Framework Plugin
+-- by QSC
+-- October 2020
+-- Updated April 2026
+
+-- Information block for the plugin
+BuildVersion = "0.0.0.28" -- updated by the compiler
+PluginInfo = {
+  Name = "BrightSign~BrightSign Companion v".. BuildVersion, -- preferred format is "manufacturer~plugin name version"
+  Version = BuildVersion,
+  Id = "8185caaa-8308-4fc6-977a-37ee8189aa38",
+  Author = "Jasper Murrell",
+  Description = "A companion component to accompany the BrightSign plugin for easier automation",
+  -- Manufacturer = "", --optional field for manufacturer of what this plugin is controlling. In 10.2 and later this field is used in Schematic Elements menu as well
+}
+
+-- Define the color of the plugin object in the design
+function GetColor(props)
+  return { 1, 102, 255 }
+end
+
+-- The name that will initially display when dragged into a design
+function GetPrettyName(props)
+  return "BrightSign Companion " .. PluginInfo.Version
+end
+
+-- Define User configurable Properties of the plugin
+function GetProperties()
+  local props = {}
+  table.insert(props, {
+    Name = "Debug Print",
+    Type = "enum",
+    Choices = {"None", "Tx/Rx", "Tx", "Rx", "Function Calls", "All"},
+    Value = "None"
+  })
+  table.insert(props, {
+    Name = "Number of Presets",
+    Type = "integer",
+    Min = 2,
+    Max = 50,
+    Value = 10,
+  })
+  return props
+end
+
+-- Optional function to update available properties when properties are altered by the user
+function RectifyProperties(props)
+  if props.plugin_show_debug.Value == false then 
+    props["Debug Print"].IsHidden = true 
+  end
+  return props
+end
+
+-- Optional function to define model if plugin supports more than one model. Uncomment if you have a Property named "Model" and don't define Model in PluginInfo
+-- function GetModel(props)
+--   local model = {}
+--   return model
+-- end
+
+-- Optional function used if plugin has multiple pages
+PageNames = { "Control", "Setup" }  --List the pages within the plugin
+function GetPages(props)
+  local pages = {}
+  for _,value in ipairs(PageNames) do
+    table.insert(pages, {name = value})
+  end
+  return pages
+end
+
+-- Defines the Controls used within the plugin
+function GetControls(props)
+  local ctrls = {}
+  table.insert(ctrls, {
+    Name = "Status", --reserved name
+    ControlType = "Indicator",
+    Count = 1,
+    IndicatorType = "Status",
+    UserPin = true, --Determines if the pin exposure is user configurable
+    PinStyle = "Output",
+  })
+  table.insert(ctrls, {
+    Name = "BrightSign Name",
+    ControlType = "Text",
+    Count = 1,
+    UserPin = true, --Determines if the pin exposure is user configurable
+    PinStyle = "Output",
+  })
+  table.insert(ctrls, {
+    Name = "Content Refresh List",
+    ControlType = "Button",
+    ButtonType = "Trigger",
+    Count = 1,
+    UserPin = true,
+    PinStyle = "Both",
+  })
+  table.insert(ctrls, {
+    Name = "Content Reset",
+    ControlType = "Button",
+    ButtonType = "Trigger",
+    Count = 1,
+    UserPin = true,
+    PinStyle = "Both",
+  })
+  table.insert(ctrls, {
+    Name = "Home Fallback Enable",
+    ControlType = "Button",
+    ButtonType = "Toggle",
+    Count = 1,
+    UserPin = true,
+    PinStyle = "Both",
+  })
+  table.insert(ctrls, {
+    Name = "Home Fallback Active",
+    ControlType = "Indicator",
+    IndicatorType = "Led",
+    Count = 1,
+    UserPin = true,
+    PinStyle = "Output",
+  })
+  table.insert(ctrls, {
+    Name = "Content Default Name",
+    ControlType = "Text",
+    Count = 1,
+    UserPin = true, --Determines if the pin exposure is user configurable
+    PinStyle = "Output",
+  })
+  
+  local varNumPresets = props["Number of Presets"].Value
+  
+  table.insert(ctrls, {
+    Name = "Content Name",
+    ControlType = "Text",
+    Count = varNumPresets,
+    UserPin = false, --Determines if the pin exposure is user configurable
+  })
+  table.insert(ctrls, {
+    Name = "Content Play",
+    ControlsType = "Button",
+    ButtonType = "Trigger",
+    Count = varNumPresets,
+    UserPin = true,
+    PinStyle = "Both",
+  })
+  table.insert(ctrls, {
+    Name = "Content Loop Enable",
+    ControlType = "Button",
+    ButtonType = "Toggle",
+    Count = varNumPresets,
+    UserPin = true,
+    PinStyle = "Both",
+  })
+  table.insert(ctrls, {
+    Name = "Content Playing",
+    ControlType = "Indicator",
+    IndicatorType = "Led",
+    Count = varNumPresets,
+    UserPin = true,
+    PinStyle = "Output",
+  })
+  return ctrls
+end
+
+--Layout of controls and graphics for the plugin UI to display
+function GetControlLayout(props)
+  local layout = {}
+  local graphics = {}
+  local CurrentPage = PageNames[props["page_index"].Value]
+  
+  local statusBarSize = { 400, 32 }
+  
+  --add image banner at the top followed by the status control underneath that can be visible accross all pages
+  layout["Status"] = {
+    PrettyName = "Status",
+    Style = "Text",
+    Position = { 0, 0 },
+    Size = statusBarSize,
+  }
+  
+  
+  
+  if CurrentPage == "Control" then
+    local padding = 8
+    local innerGap = 4
+    local labelH = 16
+    local btnW, btnH = 36,16
+    local ledSize = 16
+  
+    -- Home controls group box
+    local homeX = padding
+    local homeY = statusBarSize[2] + padding
+    local homeW = statusBarSize[1] - padding * 2
+    local homeBoxH = 16 + padding + btnH + innerGap + btnH + padding
+  
+    table.insert(graphics, {
+      Type = "GroupBox",
+      Text = "Home Controls",
+      StrokeWidth = 1,
+      Position = { homeX, homeY },
+      Size = { homeW, homeBoxH },
+      CornerRadius = 8,
+    })
+  
+    local homeInnerY = homeY + 16 + padding
+    local homeContentW = homeW - padding * 2 - ledSize - innerGap
+  
+    layout["Content Default Name"] = {
+      PrettyName = "Content Default Name",
+      Style = "ComboBox",
+      Position = { homeX + padding, homeInnerY },
+      Size = { homeContentW, btnH },
+      FontSize = 10,
+    }
+    layout["Home Fallback Active"] = {
+      PrettyName = "Home Fallback Active",
+      Style = "Led",
+      Position = { homeX + padding + homeContentW + innerGap, homeInnerY },
+      Size = { ledSize, ledSize },
+    }
+    layout["Home Fallback Enable"] = {
+      PrettyName = "Home Fallback Enable",
+      Style = "Button",
+      Legend = "Enable",
+      ButtonStyle = "Toggle",
+      Position = { homeX + padding, homeInnerY + btnH + innerGap },
+      Size = { btnW, btnH },
+    }
+    layout["Content Reset"] = {
+      PrettyName = "Content Reset",
+      Style = "Button",
+      Legend = "Reset",
+      Position = { homeX + padding + btnW + innerGap, homeInnerY + btnH + innerGap },
+      Size = { btnW, btnH },
+    }
+  
+    -- Presets group box
+    local varNumPresets = props["Number of Presets"].Value
+    local rowLabelW = 56
+    local ledColW   = 40  -- wide enough for "Playing" header label
+    local contentNameW = homeW - padding * 2 - rowLabelW - innerGap * 4 - btnW * 2 - ledColW
+  
+    local presetsX = padding
+    local presetsY = homeY + homeBoxH + padding
+    local presetsW = homeW
+    local presetsBoxH = 16 + padding + labelH + innerGap + varNumPresets * btnH + (varNumPresets - 1) * innerGap + padding
+  
+    -- Column X positions
+    local colLabel = presetsX + padding
+    local colName  = colLabel + rowLabelW + innerGap
+    local colLoop  = colName + contentNameW + innerGap
+    local colPlay  = colLoop + btnW + innerGap
+    local colLed   = colPlay + btnW + innerGap
+  
+    table.insert(graphics, {
+      Type = "GroupBox",
+      Text = "Presets",
+      Position = { presetsX, presetsY },
+      Size = { presetsW, presetsBoxH },
+      StrokeWidth = 1,
+      CornerRadius = 8,
+    })
+  
+    -- Column header labels
+    local headerY = presetsY + 16 + padding
+    table.insert(graphics, { Type = "Label", Text = "Content",  Position = { colName, headerY }, Size = { contentNameW, labelH }, HTextAlign = "Center" })
+    table.insert(graphics, { Type = "Label", Text = "Loop",     Position = { colLoop, headerY }, Size = { btnW,         labelH }, HTextAlign = "Center" })
+    table.insert(graphics, { Type = "Label", Text = "Play",     Position = { colPlay, headerY }, Size = { btnW,         labelH }, HTextAlign = "Center" })
+    table.insert(graphics, { Type = "Label", Text = "Playing",  Position = { colLed,  headerY }, Size = { ledColW,      labelH }, HTextAlign = "Center" })
+  
+    -- Preset rows
+    local dataStartY = headerY + labelH + innerGap
+  
+    for i = 1, varNumPresets do
+      local rowY = dataStartY + (i - 1) * (btnH + innerGap)
+  
+      table.insert(graphics, {
+        Type = "Label",
+        Text = "Preset " .. i .. ":",
+        Position = { colLabel, rowY },
+        Size = { rowLabelW, btnH },
+        HTextAlign = "Left",
+      })
+      layout["Content Name " .. i] = {
+        PrettyName = "Preset " .. i .. "~Content Name",
+        Style = "ComboBox",
+        Position = { colName, rowY },
+        Size = { contentNameW, btnH },
+        FontSize = 10,
+      }
+      layout["Content Loop Enable " .. i] = {
+        PrettyName = "Preset " .. i .. "~Loop",
+        Style = "Button",
+        Legend = "Loop",
+        ButtonStyle = "Toggle",
+        Position = { colLoop, rowY },
+        Size = { btnW, btnH },
+      }
+      layout["Content Play " .. i] = {
+        PrettyName = "Preset " .. i .. "~Play",
+        Style = "Button",
+        ButtonStyle = "Trigger",
+        Position = { colPlay, rowY },
+        Size = { btnW, btnH },
+      }
+      layout["Content Playing " .. i] = {
+        PrettyName = "Preset " .. i .. "~Playing",
+        Style = "Led",
+        Position = { colLed + math.floor((ledColW - ledSize) / 2), rowY + math.floor((btnH - ledSize) / 2) },
+        Size = { ledSize, ledSize },
+      }
+    end
+  
+    -- Refresh content list: bottom right, below presets
+    local refreshBtnW = 3 * btnW
+    layout["Content Refresh List"] = {
+      PrettyName = "Content Refresh List",
+      Style = "Button",
+      Legend = "Refresh Content List",
+      Position = { colLoop, presetsY + presetsBoxH + padding },
+      Size = { refreshBtnW, btnH },
+    }
+  
+  
+  
+  elseif CurrentPage == "Setup" then
+    local labelOffsetY = statusBarSize[2] + 8
+    table.insert(graphics, {
+      Type = "Label",
+      Text = "Select BrightSign Player to Control",
+      Position = { (statusBarSize[1] - 200) / 2, labelOffsetY },
+      Size = { 200, 16 },
+      HTextAlign = "Center"
+    })
+    layout["BrightSign Name"] = {
+      PrettyName = "Select BrightSign Player",
+      Style = "ComboBox",
+      Position = { (statusBarSize[1] - 200) / 2, labelOffsetY + 20 },
+      Size = { 200, 24 },
+      FontSize = 16,
+    }
+  end
+  return layout, graphics
+end
+
+-- Optional function to define components used within the plugin
+function GetComponents(props)
+  local components = {}
+  -- table.insert(components,{
+  --   Name = "main_mixer",
+  --   Type = "mixer",
+  --   Properties =   
+  --   {
+  --     ["n_inputs"] = 8,
+  --     ["n_outputs"] = 1,
+  --   }
+  -- })
+  return components
+end
+
+-- Optional function to define pins on the plugin that are not connected to a Control
+function GetPins(props)
+  local pins = {}
+  -- table.insert(pins,{
+  --   Name = "Audio Output",
+  --   Direction = "output",
+  -- })
+  
+  -- table.insert(pins,{
+  --   Name = "Serial Port",
+  --   Direction = "input", -- input for serial ports, output for serial server ports
+  --   Domain = "serial"
+  -- })
+  return pins
+end
+
+-- Optional function to define wiring of components used within the plugin
+function GetWiring(props)
+  local wiring = {}
+  -- table.insert( wiring, { "main_mixer Output 1","Audio Output" } )
+  return wiring
+end
+
+--Start event based logic
+if Controls then
+  --Utility Functions
+  function SetStatus(code, msg)
+    Controls["Status"].Value = code
+    Controls["Status"].String = msg or ""
+  end 
+  
+  function SetLoopLegends()
+    for _,ctl in pairs(Controls["Content Loop Enable"]) do
+      ctl.Legend = "Loop"
+    end
+  end 
+  
+  function DisableControls(bool)
+    Controls["Refresh Content List"].IsDisabled = bool
+    Controls["Reset Content"].IsDisabled = bool
+    Controls["Default Content Name"].IsDisabled = bool
+    Controls["Home Fallback Active"].IsDisabled = bool
+    Controls["Enable Home Fallback"].IsDisabled = bool
+    for i = 1, #Controls["Content Name"] do
+      Controls["Content Name"][i].IsDisabled = bool
+      Controls["Content Play"][i].IsDisabled = bool 
+      Controls["Content Loop Enable"][i].IsDisabled = bool
+      Controls["Content Playing"][i].IsDisabled = bool
+    end   
+  end 
+  
+  function ResetControls()
+    Controls["Default Content Name"].String = ""
+    Controls["Home Fallback Active"].Boolean = false
+    for i = 1, #Controls["Content Name"] do
+      Controls["Content Name"][i].String = ""
+      Controls["Content Loop Enable"][i].Boolean = false
+      Controls["Content Playing"][i].Boolean = false
+    end  
+  end 
+  --Operational Functions
+  
+  function HandlePlayOrLoop(idx)
+    if Controls["Content Loop Enable"][idx].Boolean then 
+      compBSN["Loop"]:Trigger()
+    else 
+      compBSN["Play"]:Trigger()
+    end 
+  end 
+  
+  function ResetContent() 
+    if Controls["Home Fallback Enable"].Boolean then 
+      if Controls["Content Default Name"].String == "" then --additional condition whereby we check if the file does indeed exist?
+        SetStatus(2, "Please Select a Default Video to Play") 
+        return 
+      end 
+      compBSN["File"].String = Controls["Content Default Name"].String
+      Timer.CallAfter(function() compBSN["Loop"]:Trigger() end, 0.2)
+    else
+      compBSN["StopClear"]:Trigger()
+    end 
+  end 
+  
+  --BrightSign Components
+  
+  function GetBrightSigns()
+    local compList = Component.GetComponents()
+    local bsnChoices = {""}
+  
+    for _,comp in pairs(compList) do
+      if comp.Type == '%PLUGIN%_a612f376-8e9f-4570-926c-faa41e4c4b33_%FP%_0eea11544914cb225448faed810577d1' then
+        table.insert(bsnChoices, comp.Name)
+      end
+    end
+  
+    table.sort(bsnChoices)
+    Controls["BrightSign Name"].Choices = bsnChoices
+  end 
+  
+  function GetContentList()
+    -- compBSN["RefreshFileList"]:Trigger()
+    local fileList = {""}
+  
+    for _,file in pairs(compBSN["FileListBox"].Choices) do
+      table.insert(fileList, file)
+    end
+  
+    table.sort(fileList)
+  
+    Controls["Content Default Name"].Choices = fileList
+    for _,ctl in pairs(Controls["Content Name"]) do
+      ctl.Choices = fileList
+    end
+  end 
+  
+  function SetComponent()
+    compBSN = Component.New(Controls["BrightSign Name"].String)
+  
+    if not compBSN["Status"] then
+      SetStatus(2, "Couldn't find BrightSign")
+      return 
+    end 
+  
+    SetStatus(0, "BrightSign Connected")
+    GetContentList()
+    SetPluginEventHandlers() --monitor the play button on the BSN plugin so that if it plays any content we can keep companion in sync
+    DisableControls(false)
+    GetContentList()
+  end
+  
+  function CheckPlayingFile()
+    local str = compBSN["DeviceResponse"].String
+  
+    if str == "STPC" or str == "Stopped" then 
+      Controls["Home Fallback Active"].Boolean = false
+      for _,ctl in pairs(Controls["Content Playing"]) do
+        ctl.Boolean = false
+      end
+      SetStatus(0, "Content has stopped")
+    end 
+  
+    if (string.find(str, "Playing: ") == nil) and (string.find(str, "Looping: ") == nil) then
+      return
+    end 
+  
+    local filename = string.lower(string.sub(str, 10, #str))
+    
+    Controls["Home Fallback Active"].Boolean = (string.lower(Controls["Content Default Name"].String) == filename)
+  
+    for i,ctl in pairs(Controls["Content Name"]) do
+      Controls["Content Playing"][i].Boolean = (string.lower(Controls["Content Name"][i].String) == filename)
+    end
+  
+    SetStatus(0)
+  end 
+  
+  --BSN Plugin EventHandlers (and resets for when changing)
+  
+  function SetPluginEventHandlers()
+    compBSN["DeviceResponse"].EventHandler = nil
+    compBSN["DeviceResponse"].EventHandler = function(ctl)
+      CheckPlayingFile()
+    end 
+  end 
+  
+  --Controls EventHandlers
+  
+  Controls["BrightSign Name"].EventHandler = function()
+    SetComponent()
+    ResetControls()
+  end 
+  Controls["Content Refresh List"].EventHandler = GetContentList
+  Controls["Content Reset"].EventHandler = ResetContent
+  
+  for i,ctl in pairs(Controls["Content Play"]) do
+    ctl.EventHandler = function()
+      if not compBSN["File"].String then
+        SetStatus(2, "No Valid BrightSign")
+        return 
+      end 
+  
+      if Controls["Content Name"][i].String == "" then 
+        SetStatus(2, "Please Select a valid video to play")
+        return
+      end 
+  
+      compBSN["File"].String = Controls["Content Name"][i].String
+      SetStatus(5, "Trying to play")
+      HandlePlayOrLoop(i)
+    end 
+  end
+  
+  --Initialise
+  
+  function Init()
+    GetBrightSigns()
+  
+    if #Controls["BrightSign Name"].String > 0 then --does BSN have a name
+      DisableControls(false)
+      SetComponent()
+      return
+    end 
+  
+    DisableControls(true)
+  end 
+  
+  Timer.CallAfter( --Allow for BSN Plugins to Initialise in the Design before starting up
+    function() Init() end, 1
+  )
+end
