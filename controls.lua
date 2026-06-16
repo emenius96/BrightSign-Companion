@@ -63,7 +63,7 @@ table.insert(ctrls, {
 })
 table.insert(ctrls, {
   Name = "Content Play",
-  ControlsType = "Button",
+  ControlType = "Button",
   ButtonType = "Trigger",
   Count = varNumPresets,
   UserPin = true,
