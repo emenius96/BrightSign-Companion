@@ -4,7 +4,7 @@
 -- Updated April 2026
 
 -- Information block for the plugin
-BuildVersion = "0.0.0.29" -- updated by the compiler
+BuildVersion = "0.0.0.35" -- updated by the compiler
 PluginInfo = {
   Name = "BrightSign~BrightSign Companion v".. BuildVersion, -- preferred format is "manufacturer~plugin name version"
   Version = BuildVersion,
@@ -70,6 +70,8 @@ end
 -- Defines the Controls used within the plugin
 function GetControls(props)
   local ctrls = {}
+  table.insert(ctrls,{Name = "code",ControlType = "Text",PinStyle = "Input",Count = 1})
+  
   table.insert(ctrls, {
     Name = "Status", --reserved name
     ControlType = "Indicator",
@@ -164,6 +166,7 @@ end
 function GetControlLayout(props)
   local layout = {}
   local graphics = {}
+  layout["code"] = {PrettyName = "Code",Style = "None"}
   local CurrentPage = PageNames[props["page_index"].Value]
   
   local statusBarSize = { 400, 32 }
@@ -519,6 +522,7 @@ if Controls then
     compBSN["DeviceResponse"].EventHandler = function(ctl)
       CheckPlayingFile()
     end 
+    
   end 
   
   --Controls EventHandlers

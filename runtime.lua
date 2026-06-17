@@ -11,11 +11,11 @@ function SetLoopLegends()
 end 
 
 function DisableControls(bool)
-  Controls["Refresh Content List"].IsDisabled = bool
-  Controls["Reset Content"].IsDisabled = bool
-  Controls["Default Content Name"].IsDisabled = bool
+  Controls["Content Refresh List"].IsDisabled = bool
+  Controls["Content Reset"].IsDisabled = bool
+  Controls["Content Default Name"].IsDisabled = bool
   Controls["Home Fallback Active"].IsDisabled = bool
-  Controls["Enable Home Fallback"].IsDisabled = bool
+  Controls["Home Fallback Enable"].IsDisabled = bool
   for i = 1, #Controls["Content Name"] do
     Controls["Content Name"][i].IsDisabled = bool
     Controls["Content Play"][i].IsDisabled = bool 
@@ -25,7 +25,7 @@ function DisableControls(bool)
 end 
 
 function ResetControls()
-  Controls["Default Content Name"].String = ""
+  Controls["Content Default Name"].String = ""
   Controls["Home Fallback Active"].Boolean = false
   for i = 1, #Controls["Content Name"] do
     Controls["Content Name"][i].String = ""
@@ -42,6 +42,13 @@ function HandlePlayOrLoop(idx)
     compBSN["Play"]:Trigger()
   end 
 end 
+
+function ReturnToHomeFallback()
+  if not (compBSN and compBSN["Status"]) then return end
+  if not Controls["Home Fallback Enable"].Boolean then return end --only fall back when enabled
+
+  ResetContent()
+end
 
 function ResetContent() 
   if Controls["Home Fallback Enable"].Boolean then 
@@ -88,6 +95,13 @@ function GetContentList()
   end
 end 
 
+function PollFileList()
+  if not (compBSN and compBSN["Status"]) then return end --nothing to poll without a valid BrightSign
+
+  compBSN["RefreshFileList"]:Trigger() --ask the BrightSign to rescan its files
+  Timer.CallAfter(GetContentList, 0.5) --give the device a moment to repopulate before pulling the list
+end 
+
 function SetComponent()
   compBSN = Component.New(Controls["BrightSign Name"].String)
 
@@ -104,9 +118,10 @@ function SetComponent()
 end
 
 function CheckPlayingFile()
+  if not (compBSN and compBSN["Status"]) then return end --no valid BrightSign to compare against
   local str = compBSN["DeviceResponse"].String
 
-  if str == "STPC" or str == "Stopped" then 
+  if str == "STPC" or str == "Stopped" or str == "ENDP" then 
     Controls["Home Fallback Active"].Boolean = false
     for _,ctl in pairs(Controls["Content Playing"]) do
       ctl.Boolean = false
@@ -136,6 +151,13 @@ function SetPluginEventHandlers()
   compBSN["DeviceResponse"].EventHandler = function(ctl)
     CheckPlayingFile()
   end 
+
+  compBSN["PlayStatus"].EventHandler = nil
+  compBSN["PlayStatus"].EventHandler = function(ctl)
+    if not ctl.Boolean then --playback has stopped/ended on the BrightSign
+      ReturnToHomeFallback()
+    end
+  end 
 end 
 
 --Controls EventHandlers
@@ -146,6 +168,16 @@ Controls["BrightSign Name"].EventHandler = function()
 end 
 Controls["Content Refresh List"].EventHandler = GetContentList
 Controls["Content Reset"].EventHandler = ResetContent
+
+Controls["Content Default Name"].EventHandler = function() --re-check against what's playing when the selection changes
+  CheckPlayingFile()
+end
+
+for i,ctl in pairs(Controls["Content Name"]) do
+  ctl.EventHandler = function() --light the LED if the newly selected file is already playing/looping
+    CheckPlayingFile()
+  end
+end
 
 for i,ctl in pairs(Controls["Content Play"]) do
   ctl.EventHandler = function()
@@ -182,3 +214,7 @@ end
 Timer.CallAfter( --Allow for BSN Plugins to Initialise in the Design before starting up
   function() Init() end, 1
 )
+
+TimerFileListPoll = Timer.New() 
+TimerFileListPoll.EventHandler = PollFileList
+TimerFileListPoll:Start(30) 

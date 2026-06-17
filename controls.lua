@@ -1,3 +1,5 @@
+table.insert(ctrls,{Name = "code",ControlType = "Text",PinStyle = "Input",Count = 1})
+
 table.insert(ctrls, {
   Name = "Status", --reserved name
   ControlType = "Indicator",
