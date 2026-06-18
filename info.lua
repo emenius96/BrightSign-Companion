@@ -1,4 +1,4 @@
-BuildVersion = "0.0.0.35" -- updated by the compiler
+BuildVersion = "0.1.0.1" -- updated by the compiler
 PluginInfo = {
   Name = "BrightSign~BrightSign Companion v".. BuildVersion, -- preferred format is "manufacturer~plugin name version"
   Version = BuildVersion,

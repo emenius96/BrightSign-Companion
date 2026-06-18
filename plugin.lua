@@ -54,7 +54,7 @@ end
 function GetControlLayout(props)
   local layout = {}
   local graphics = {}
-  layout["code"] = {PrettyName = "Code",Style = "None"}
+  -- layout["code"] = {PrettyName = "Code",Style = "None"}
   --[[ #include "layout.lua" ]]
   return layout, graphics
 end

@@ -158,6 +158,15 @@ function SetPluginEventHandlers()
       ReturnToHomeFallback()
     end
   end 
+
+  compBSN["Status"].EventHandler = nil
+  compBSN["Status"].EventHandler = function(ctl)
+    if ctl.Value ~= 0 then --BrightSign's Status has gone missing/faulted
+      SetStatus(4, "BrightSign Missing")
+    else
+      SetStatus(0, "BrightSign Connected")
+    end
+  end 
 end 
 
 --Controls EventHandlers
@@ -217,4 +226,4 @@ Timer.CallAfter( --Allow for BSN Plugins to Initialise in the Design before star
 
 TimerFileListPoll = Timer.New() 
 TimerFileListPoll.EventHandler = PollFileList
-TimerFileListPoll:Start(30) 
+TimerFileListPoll:Start(30)   
