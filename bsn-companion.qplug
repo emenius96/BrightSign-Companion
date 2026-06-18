@@ -4,7 +4,7 @@
 -- Updated April 2026
 
 -- Information block for the plugin
-BuildVersion = "0.1.0.1" -- updated by the compiler
+BuildVersion = "0.1.0.2" -- updated by the compiler
 PluginInfo = {
   Name = "BrightSign~BrightSign Companion v".. BuildVersion, -- preferred format is "manufacturer~plugin name version"
   Version = BuildVersion,
@@ -423,14 +423,17 @@ if Controls then
   
   function HandlePlayOrLoop(idx)
     if Controls["Content Loop Enable"][idx].Boolean then 
+      currentlyLooping = true --loops restart themselves, so ignore the gaps between iterations
       compBSN["Loop"]:Trigger()
     else 
+      currentlyLooping = false --one-shot play; falling back to home when it ends is desired
       compBSN["Play"]:Trigger()
     end 
   end 
   
   function ReturnToHomeFallback()
     if not (compBSN and compBSN["Status"]) then return end
+    if currentlyLooping then return end --looping content restarts on its own, don't fall back between loops
     if not Controls["Home Fallback Enable"].Boolean then return end --only fall back when enabled
   
     ResetContent()
@@ -443,8 +446,10 @@ if Controls then
         return 
       end 
       compBSN["File"].String = Controls["Content Default Name"].String
+      currentlyLooping = true --the home fallback loops, so ignore its loop gaps too
       Timer.CallAfter(function() compBSN["Loop"]:Trigger() end, 0.2)
     else
+      currentlyLooping = false
       compBSN["StopClear"]:Trigger()
     end 
   end 
@@ -544,6 +549,15 @@ if Controls then
         ReturnToHomeFallback()
       end
     end 
+  
+    compBSN["Status"].EventHandler = nil
+    compBSN["Status"].EventHandler = function(ctl)
+      if ctl.Value ~= 0 then --BrightSign's Status has gone missing/faulted
+        SetStatus(4, "BrightSign Missing")
+      else
+        SetStatus(0, "BrightSign Connected")
+      end
+    end 
   end 
   
   --Controls EventHandlers
@@ -603,5 +617,5 @@ if Controls then
   
   TimerFileListPoll = Timer.New() 
   TimerFileListPoll.EventHandler = PollFileList
-  TimerFileListPoll:Start(30) 
+  TimerFileListPoll:Start(30)   
 end

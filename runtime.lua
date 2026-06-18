@@ -37,14 +37,17 @@ end
 
 function HandlePlayOrLoop(idx)
   if Controls["Content Loop Enable"][idx].Boolean then 
+    currentlyLooping = true --loops restart themselves, so ignore the gaps between iterations
     compBSN["Loop"]:Trigger()
   else 
+    currentlyLooping = false --one-shot play; falling back to home when it ends is desired
     compBSN["Play"]:Trigger()
   end 
 end 
 
 function ReturnToHomeFallback()
   if not (compBSN and compBSN["Status"]) then return end
+  if currentlyLooping then return end --looping content restarts on its own, don't fall back between loops
   if not Controls["Home Fallback Enable"].Boolean then return end --only fall back when enabled
 
   ResetContent()
@@ -57,8 +60,10 @@ function ResetContent()
       return 
     end 
     compBSN["File"].String = Controls["Content Default Name"].String
+    currentlyLooping = true --the home fallback loops, so ignore its loop gaps too
     Timer.CallAfter(function() compBSN["Loop"]:Trigger() end, 0.2)
   else
+    currentlyLooping = false
     compBSN["StopClear"]:Trigger()
   end 
 end 
